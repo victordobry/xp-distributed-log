@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"strings"
 
 	api "github.com/victordobry/xp-distributed-log/api/v1"
 )
@@ -73,10 +72,9 @@ func (s *grpcServer) ConsumeStream(
 			res, err := s.Consume(stream.Context(), req)
 			switch err.(type) {
 			case nil:
+			case api.ErrOffsetOutOfRange:
+				continue
 			default:
-				if strings.Contains(err.Error(), "out of range") {
-					continue
-				}
 				return err
 			}
 			if err = stream.Send(res); err != nil {
