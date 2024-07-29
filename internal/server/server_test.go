@@ -38,17 +38,12 @@ func setupTest(t *testing.T, fn func(*Config)) (
 	teardown func(),
 ) {
 	t.Helper()
-	l, err := net.Listen("tcp", ":0")
-	require.NoError(t, err)
-	clientOptions := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-	cc, err := grpc.NewClient(l.Addr().String(), clientOptions...)
-	require.NoError(t, err)
+	// Create log:
 	dir, err := os.MkdirTemp("", "*")
 	require.NoError(t, err)
 	clog, err := log.NewLog(dir, log.Config{})
 	require.NoError(t, err)
+	// Create gRPC server:
 	cfg = &Config{
 		CommitLog: clog,
 	}
@@ -57,13 +52,23 @@ func setupTest(t *testing.T, fn func(*Config)) (
 	}
 	server, err := NewGRPCServer(cfg)
 	require.NoError(t, err)
+	// Serve gRPC server:
+	l, err := net.Listen("tcp", ":0")
+	require.NoError(t, err)
 	go func() {
 		server.Serve(l)
 	}()
+	// Create gRPC client connection:
+	clientOptions := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+	cc, err := grpc.NewClient(l.Addr().String(), clientOptions...)
+	require.NoError(t, err)
+	// Create gRPC client:
 	client = api.NewLogClient(cc)
 	return client, cfg, func() {
-		server.Stop()
 		cc.Close()
+		server.Stop()
 		l.Close()
 		clog.Remove()
 	}
